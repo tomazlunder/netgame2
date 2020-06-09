@@ -11,6 +11,7 @@ import my.games.netgame2.MainClass;
 import my.games.netgame2.game.Constants;
 import my.games.netgame2.game.GameClass;
 import my.games.netgame2.game.Player;
+import my.games.netgame2.ui.Button;
 
 public class GameScreen implements Screen {
 
@@ -21,11 +22,15 @@ public class GameScreen implements Screen {
     Sprite spriteBackgound;
     Texture texturePlayer, textureBall;
 
+    Button buttonMainMenu;
+
 
     public GameScreen(MainClass mainClass) {
         parent = mainClass;
 
         gameClass = new GameClass(new Player(0, false), new Player(1, true));
+
+        buttonMainMenu = new Button(0.40f, 0.4f, 0.2f, 0.10f, "images/plays_btn.png", "images/plays_btn_sel.png");
     }
 
     @Override
@@ -40,6 +45,10 @@ public class GameScreen implements Screen {
         handleInput(deltaTime);
         gameClass.update(deltaTime);
         draw(deltaTime);
+
+        if(gameClass.state == gameClass.ENDED){
+            updateButton();
+        }
     }
 
     @Override
@@ -111,6 +120,10 @@ public class GameScreen implements Screen {
             parent.fontBig.draw(parent.batch, Integer.toString( (int) gameClass.pauseTime + 1),width * 0.49f, height * 0.6f);
         }
 
+        if(gameClass.state == gameClass.ENDED){
+            buttonMainMenu.draw(parent.batch);
+        }
+
         parent.batch.end();
     }
 
@@ -119,6 +132,13 @@ public class GameScreen implements Screen {
             gameClass.movePlayer(gameClass.player1, 0, deltaTime);
         } else if (Gdx.input.isKeyPressed(Input.Keys.DOWN) || Gdx.input.isKeyPressed(Input.Keys.S)) {
             gameClass.movePlayer(gameClass.player1, 1, deltaTime);
+        }
+    }
+
+    public void updateButton(){
+        buttonMainMenu.updateMouse();
+        if(Gdx.input.justTouched() && buttonMainMenu.isActive){
+            parent.changeScreen(parent.MAINMENU);
         }
     }
 }

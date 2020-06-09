@@ -61,7 +61,7 @@ public class MainClass extends Game {
 				this.setScreen(screenMainMenu);
 				break;
 			case GAME:
-				if(screenGame == null) screenGame = new GameScreen(this);
+				screenGame = new GameScreen(this);
 				this.setScreen(screenGame);
 				break;
 			case SETTINGS:
@@ -69,13 +69,11 @@ public class MainClass extends Game {
 				this.setScreen(screenSettings);
 				break;
 			case GAME_MATCHMAKING:
-				if(screenMatchmaking == null) {
-					try {
-						screenMatchmaking = new ClientGameScreen(this);
-						this.setScreen(screenMatchmaking);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
+				try {
+					screenMatchmaking = new ClientGameScreen(this);
+					this.setScreen(screenMatchmaking);
+				} catch (IOException e) {
+					e.printStackTrace();
 				}
 				break;
 		}

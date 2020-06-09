@@ -35,16 +35,17 @@ public class ClientGameScreen extends GameScreen{
 
     private static DatagramSocket socket;
 
+    private DatagramPacket lastPacket;
+    private float retryTimer;
+    private final float timeToRetry = 10f;
+    private int numRetries = 0;
+
     private static byte[] buf;
 
-    private int socketOutPort;
     private int socketInPort;
 
     private float pauseTime;
     private int lastScored;
-
-    //TODO: Change
-    private static final String serverAdress = "localhost";
 
     public ClientGameScreen(MainClass mainClass) throws IOException {
         super(mainClass);
@@ -57,11 +58,12 @@ public class ClientGameScreen extends GameScreen{
         blockingQueue = new ArrayBlockingQueue<Message>(128);
 
         socket = new DatagramSocket();
-        socketOutPort = socket.getPort();
+        System.out.println("Opened socket (OUT) [PORT:"+socket.getLocalPort()+"]");
+
         udpProducer = new UDPproducer(blockingQueue);
         new Thread(udpProducer).start();
         socketInPort = udpProducer.getPort();
-        System.out.println("Spawned UDP producer thread");
+        System.out.println("Spawned UDP producer thread [PORT:"+udpProducer.getPort()+"]");
 
         sendLFG();
     }
@@ -69,6 +71,8 @@ public class ClientGameScreen extends GameScreen{
     //Not updating gameClass like gameScreen
     @Override
     public void render(float deltaTime) {
+        messageResender(deltaTime);
+
         if(connectionState == GAME_PAUSED){
             pauseTime -= deltaTime;
         }
@@ -78,6 +82,32 @@ public class ClientGameScreen extends GameScreen{
         draw(deltaTime);
         clientDraw();
         respondToMessages();
+
+        if(gameClass.state == gameClass.ENDED){
+            updateButton();
+        }
+    }
+
+    public void messageResender(float deltaTime){
+        if(numRetries >= 6){
+            System.out.println("Reached maximum resend number. Returning to main menu.");
+            parent.changeScreen(parent.MAINMENU);
+        }
+
+        if(connectionState == WAITING_FOR_LFG_ACK){
+            retryTimer += deltaTime;
+        }
+
+        if(retryTimer > timeToRetry){
+            retryTimer = 0;
+            numRetries ++;
+            System.out.println("Retrying to send packet: "+new String(lastPacket.getData()).trim().split("!")[0]);
+            try {
+                socket.send(lastPacket);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
@@ -101,7 +131,7 @@ public class ClientGameScreen extends GameScreen{
     public void updateServer(){
         InetAddress inetAddress = null;
         try {
-            inetAddress = InetAddress.getByName(serverAdress);
+            inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
             String packetString = "" + MessageTypes.PLAYER_POS +","+thisPlayer.position.x+","+thisPlayer.position.y + "!";
             buf = packetString.getBytes();
             DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_IN_PORT);
@@ -131,6 +161,8 @@ public class ClientGameScreen extends GameScreen{
             parent.font.draw(parent.batch, "WAITING_FOR_GAMEINFO",width * 0.2f, height * 0.7f);
         } else if(connectionState == WAITING_FOR_START){
             parent.font.draw(parent.batch, "WAITING_FOR_START",width * 0.2f, height * 0.7f);
+        } else if(connectionState == GAME_ENDED){
+            parent.font.draw(parent.batch, "GAME ENDED",width * 0.2f, height * 0.7f);
         }
 
         parent.batch.end();
@@ -139,14 +171,15 @@ public class ClientGameScreen extends GameScreen{
     public void sendLFG(){
         InetAddress inetAddress = null;
         try {
-            inetAddress = InetAddress.getByName(serverAdress);
+            inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
             String packetString = "" + MessageTypes.LFG +","+socketInPort+","+"defaultName"+"!";
             buf = packetString.getBytes();
             DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_IN_PORT);
             socket.send(packet);
+            lastPacket = packet;
 
             connectionState = WAITING_FOR_LFG_ACK;
-            System.out.println("Sent LFG packet");
+            System.out.println("Sent LFG packet to "+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_IN_PORT);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -168,10 +201,15 @@ public class ClientGameScreen extends GameScreen{
             switch (message.id){
                 case MessageTypes.LFG_ACK:
                     System.out.println("Received LFG_ACK");
+                    retryTimer = 0;
+                    numRetries = 0;
+
                     connectionState = WAITING_FOR_GAMEINFO;
                     break;
                 case MessageTypes.GAME_INFO:
                     System.out.println("Received GAME_INFO");
+                    retryTimer = 0;
+                    numRetries = 0;
 
                     String playerNumberString = message.data[0].trim();
                     this.playerNumber = Integer.parseInt(playerNumberString);
@@ -223,8 +261,16 @@ public class ClientGameScreen extends GameScreen{
                     lastScored = Integer.parseInt(player);
                     if(lastScored == 0){
                         gameClass.player2.lives--;
+                        if(gameClass.player2.lives == 0){
+                            connectionState = GAME_ENDED;
+                            gameClass.state = gameClass.ENDED;
+                        }
                     } else{
                         gameClass.player1.lives--;
+                        if(gameClass.player1.lives == 0){
+                            connectionState = GAME_ENDED;
+                            gameClass.state = gameClass.ENDED;
+                        }
                     }
             }
         } catch (InterruptedException e) {

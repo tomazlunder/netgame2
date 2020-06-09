@@ -3,6 +3,8 @@ package my.games.netgame2.server;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.regex.Pattern;
@@ -17,6 +19,18 @@ public  class UDPproducer implements Runnable{
         socket = new DatagramSocket();
 
         this.blockingQueue = bq;
+
+        //Firewall trick (to allow packets from server)
+        //TODO: make work
+        String packetString = "" + MessageTypes.PING + "!";
+        byte[] buf = packetString.getBytes();
+        DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName(NetworkConstants.SERVER_ADDRESS), NetworkConstants.SERVER_OUT_PORT);
+        socket.send(packet);
+        System.out.println("[UDPproducer] WIP Sent ping to serverOUT ("+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_OUT_PORT);
+
+        packet = new DatagramPacket(buf, buf.length, InetAddress.getByName(NetworkConstants.SERVER_ADDRESS), NetworkConstants.SERVER_IN_PORT);
+        socket.send(packet);
+        System.out.println("[UDPproducer] WIP Sent ping to serverIN ("+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_IN_PORT);
     }
 
     public UDPproducer(BlockingQueue<Message> bq, int port) throws IOException {
