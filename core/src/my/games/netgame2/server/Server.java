@@ -107,7 +107,7 @@ public class Server {
                 //GAME_INFO for client2
                 packetString = "" + MessageTypes.GAME_INFO + "," + "1" + "!";
                 buf = packetString.getBytes();
-                packet = new DatagramPacket(buf, buf.length, client1.ip, client2.port);
+                packet = new DatagramPacket(buf, buf.length, client2.ip, client2.port);
                 socket.send(packet);
                 client2.lastPacket = packet;
                 client2.state = Client.WAITING_FOR_GAMEINFO_ACK;
