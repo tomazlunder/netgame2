@@ -15,32 +15,10 @@ public  class UDPproducer implements Runnable{
 
     private BlockingQueue<Message> blockingQueue;
 
-    public UDPproducer(BlockingQueue<Message> bq) throws IOException {
-        socket = new DatagramSocket();
+    public UDPproducer(DatagramSocket socket, BlockingQueue<Message> bq) throws IOException {
+        this.socket = socket;
 
         this.blockingQueue = bq;
-
-        //Firewall trick (to allow packets from server)
-        //TODO: make work
-        String packetString = "" + MessageTypes.PING + "!";
-        byte[] buf = packetString.getBytes();
-        DatagramPacket packet = new DatagramPacket(buf, buf.length, InetAddress.getByName(NetworkConstants.SERVER_ADDRESS), NetworkConstants.SERVER_OUT_PORT);
-        socket.send(packet);
-        System.out.println("[UDPproducer] WIP Sent ping to serverOUT ("+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_OUT_PORT);
-
-        packet = new DatagramPacket(buf, buf.length, InetAddress.getByName(NetworkConstants.SERVER_ADDRESS), NetworkConstants.SERVER_IN_PORT);
-        socket.send(packet);
-        System.out.println("[UDPproducer] WIP Sent ping to serverIN ("+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_IN_PORT);
-    }
-
-    public UDPproducer(BlockingQueue<Message> bq, int port) throws IOException {
-        socket = new DatagramSocket(port);
-
-        this.blockingQueue = bq;
-    }
-
-    public int getPort(){
-        return socket.getLocalPort();
     }
 
     public void run() {

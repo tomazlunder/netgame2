@@ -5,7 +5,6 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.math.Vector2;
 import my.games.netgame2.MainClass;
 import my.games.netgame2.game.Constants;
-import my.games.netgame2.game.GameClass;
 import my.games.netgame2.game.Player;
 import my.games.netgame2.server.*;
 
@@ -42,8 +41,6 @@ public class ClientGameScreen extends GameScreen{
 
     private static byte[] buf;
 
-    private int socketInPort;
-
     private float pauseTime;
     private int lastScored;
 
@@ -58,12 +55,11 @@ public class ClientGameScreen extends GameScreen{
         blockingQueue = new ArrayBlockingQueue<Message>(128);
 
         socket = new DatagramSocket();
-        System.out.println("Opened socket (OUT) [PORT:"+socket.getLocalPort()+"]");
+        System.out.println("Opened socket [PORT:"+socket.getLocalPort()+"]");
 
-        udpProducer = new UDPproducer(blockingQueue);
+        udpProducer = new UDPproducer(socket,blockingQueue);
         new Thread(udpProducer).start();
-        socketInPort = udpProducer.getPort();
-        System.out.println("Spawned UDP producer thread [PORT:"+udpProducer.getPort()+"]");
+        System.out.println("Spawned UDP producer thread");
 
         sendLFG();
     }
@@ -93,6 +89,7 @@ public class ClientGameScreen extends GameScreen{
             System.out.println("Reached maximum resend number. Returning to main menu.");
             parent.changeScreen(parent.MAINMENU);
         }
+
 
         if(connectionState == WAITING_FOR_LFG_ACK){
             retryTimer += deltaTime;
@@ -134,7 +131,7 @@ public class ClientGameScreen extends GameScreen{
             inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
             String packetString = "" + MessageTypes.PLAYER_POS +","+thisPlayer.position.x+","+thisPlayer.position.y + "!";
             buf = packetString.getBytes();
-            DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_IN_PORT);
+            DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
             socket.send(packet);
         } catch (UnknownHostException e) {
             e.printStackTrace();
@@ -172,14 +169,14 @@ public class ClientGameScreen extends GameScreen{
         InetAddress inetAddress = null;
         try {
             inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
-            String packetString = "" + MessageTypes.LFG +","+socketInPort+","+"defaultName"+"!";
+            String packetString = "" + MessageTypes.LFG +","+"defaultName"+"!";
             buf = packetString.getBytes();
-            DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_IN_PORT);
+            DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
             socket.send(packet);
             lastPacket = packet;
 
             connectionState = WAITING_FOR_LFG_ACK;
-            System.out.println("Sent LFG packet to "+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_IN_PORT);
+            System.out.println("Sent LFG packet to "+NetworkConstants.SERVER_ADDRESS+":"+NetworkConstants.SERVER_PORT);
         } catch (UnknownHostException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -225,7 +222,7 @@ public class ClientGameScreen extends GameScreen{
                     //Respond with GAME_INFO_ACK
                     String packetString = "" + MessageTypes.GAME_INFO_ACK + "!";
                     buf = packetString.getBytes();
-                    DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_IN_PORT);
+                    DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
                     socket.send(packet);
 
                     System.out.println("Sent GAME_INFO_ACK");
