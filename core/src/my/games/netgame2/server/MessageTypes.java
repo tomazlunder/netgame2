@@ -11,5 +11,5 @@ public class MessageTypes {
     public static final int PLAYER_POS = 6;
 
     public static final int GAME_SCORED = 7;
-    public static final int GAME_ENDED = 8;
+    public static final int GAME_SCORED_ACK = 8;
 }

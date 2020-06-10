@@ -6,7 +6,7 @@ public class Player {
     public Vector2 position;
     boolean ai;
     public int lives;
-    int playerNumber;
+    public int playerNumber;
 
     boolean ai_moving;
 

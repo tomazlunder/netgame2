@@ -19,7 +19,7 @@ public class GameScreen implements Screen {
 
     GameClass gameClass;
 
-    Sprite spriteBackgound;
+    Sprite spriteBackground;
     Texture texturePlayer, textureBall;
 
     Button buttonMainMenu;
@@ -35,7 +35,7 @@ public class GameScreen implements Screen {
 
     @Override
     public void show() {
-        spriteBackgound = new Sprite(new Texture("images/white.png"));
+        spriteBackground = new Sprite(new Texture("images/white.png"));
         texturePlayer = new Texture("images/black.png");
         textureBall = new Texture("images/ball.png");
     }
@@ -44,7 +44,7 @@ public class GameScreen implements Screen {
     public void render(float deltaTime) {
         handleInput(deltaTime);
         gameClass.update(deltaTime);
-        draw(deltaTime);
+        draw();
 
         if(gameClass.state == gameClass.ENDED){
             updateButton();
@@ -54,6 +54,8 @@ public class GameScreen implements Screen {
     @Override
     public void resize(int width, int height) {
         parent.batch.getProjectionMatrix().setToOrtho2D(0, 0, width, height);
+        buttonMainMenu.calculatePosAndDim();
+        parent.generateFonts();
     }
 
     @Override
@@ -76,7 +78,7 @@ public class GameScreen implements Screen {
         // TODO Auto-generated method stub
     }
 
-    public void draw(float deltaTime){
+    public void draw(){
         float width = Gdx.graphics.getWidth();
         float height = Gdx.graphics.getHeight();
 
@@ -107,7 +109,7 @@ public class GameScreen implements Screen {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         parent.batch.begin();
-        parent.batch.draw(spriteBackgound, width * Constants.BORDER_RATIO, height * Constants.BORDER_RATIO, width * (1 - 2 * Constants.BORDER_RATIO), height * (1 - 2 * Constants.BORDER_RATIO));
+        parent.batch.draw(spriteBackground, width * Constants.BORDER_RATIO, height * Constants.BORDER_RATIO, width * (1 - 2 * Constants.BORDER_RATIO), height * (1 - 2 * Constants.BORDER_RATIO));
 
         parent.batch.draw(texturePlayer, p1position.x - (playerWidth / 2.0f), p1position.y - (player1height / 2.0f), playerWidth, player1height);
         parent.batch.draw(texturePlayer, p2position.x - (playerWidth / 2.0f), p2position.y - (player2height / 2.0f), playerWidth, player2height);

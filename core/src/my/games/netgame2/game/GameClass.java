@@ -7,8 +7,6 @@ public class GameClass {
     public Player player2;
     public Ball ball;
 
-    public int winner;
-
     public float pauseTime;
 
     public final int RUNNING = 0;
@@ -26,7 +24,6 @@ public class GameClass {
         ball = new Ball();
         state = PAUSED;
         pauseTime = Constants.START_PAUSE_TIME;
-        winner = -1;
         justScored = -1;
     }
 
@@ -133,12 +130,6 @@ public class GameClass {
             }
         }
     }
-
-    //-1 noone scored, 0 - left scored, 1 - rightScored
-    public int scoreCheck(){
-        return justScored;
-    }
-
 
     public void aiMove(Player player, float deltaTime){
         if(player.playerNumber == 0 && ball.direction.x > 0) return;

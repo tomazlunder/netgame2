@@ -8,10 +8,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
-import my.games.netgame2.screens.GameScreen;
-import my.games.netgame2.screens.MainMenuScreen;
-import my.games.netgame2.screens.SettingsScreen;
-import my.games.netgame2.screens.ClientGameScreen;
+import my.games.netgame2.screens.*;
 
 import java.io.IOException;
 
@@ -21,20 +18,23 @@ public class MainClass extends Game {
 	public final static int GAME = 1;
 	public final static int SETTINGS = 2;
 	public final static int GAME_MATCHMAKING = 3;
+	public final static int ENTER_NAME = 4;
 
 	Screen screenMainMenu;
 	Screen screenGame;
 	Screen screenSettings;
 	Screen screenMatchmaking;
+	Screen screenName;
 
 	public BitmapFont font;
 	public BitmapFont fontBig;
 	String FONT_PATH = "fonts/OpenSans-Bold.ttf";
 
+	public String myUsername = "";
+
 	//Batch
 	public SpriteBatch batch;
-	Texture img;
-	
+
 	@Override
 	public void create () {
 		batch = new SpriteBatch();
@@ -51,7 +51,6 @@ public class MainClass extends Game {
 	@Override
 	public void dispose () {
 		batch.dispose();
-		img.dispose();
 	}
 
 	public void changeScreen(int screen){
@@ -76,11 +75,15 @@ public class MainClass extends Game {
 					e.printStackTrace();
 				}
 				break;
+			case ENTER_NAME:
+				screenName = new EnterNameScreen(this);
+				this.setScreen(screenName);
+				break;
 		}
 	}
 
 
-	private void generateFonts(){
+	public void generateFonts(){
 		FreeTypeFontGenerator generator = new FreeTypeFontGenerator(Gdx.files.internal(FONT_PATH));
 		FreeTypeFontGenerator.FreeTypeFontParameter parameter = new FreeTypeFontGenerator.FreeTypeFontParameter();
 		parameter.size = Gdx.graphics.getHeight()/15;

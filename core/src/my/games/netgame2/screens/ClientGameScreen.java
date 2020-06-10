@@ -21,7 +21,6 @@ public class ClientGameScreen extends GameScreen{
 
     public final int WAITING_FOR_LFG_ACK = 0;
     public final int WAITING_FOR_GAMEINFO = 1;
-    public final int WAITING_FOR_START = 2;
     public final int GAME_ON = 3;
     public final int GAME_PAUSED = 4;
     public final int GAME_ENDED = 5;
@@ -36,13 +35,14 @@ public class ClientGameScreen extends GameScreen{
 
     private DatagramPacket lastPacket;
     private float retryTimer;
-    private final float timeToRetry = 10f;
     private int numRetries = 0;
 
     private static byte[] buf;
 
     private float pauseTime;
-    private int lastScored;
+
+    private String nameOpponent;
+    int lastScored;
 
     public ClientGameScreen(MainClass mainClass) throws IOException {
         super(mainClass);
@@ -52,7 +52,7 @@ public class ClientGameScreen extends GameScreen{
         lastScored = -1;
         thisPlayer = null;
 
-        blockingQueue = new ArrayBlockingQueue<Message>(128);
+        blockingQueue = new ArrayBlockingQueue<>(128);
 
         socket = new DatagramSocket();
         System.out.println("Opened socket [PORT:"+socket.getLocalPort()+"]");
@@ -75,7 +75,7 @@ public class ClientGameScreen extends GameScreen{
 
         handleInput(deltaTime);
 
-        draw(deltaTime);
+        draw();
         clientDraw();
         respondToMessages();
 
@@ -95,7 +95,7 @@ public class ClientGameScreen extends GameScreen{
             retryTimer += deltaTime;
         }
 
-        if(retryTimer > timeToRetry){
+        if(retryTimer > NetworkConstants.PACKET_RETRY_TIME){
             retryTimer = 0;
             numRetries ++;
             System.out.println("Retrying to send packet: "+new String(lastPacket.getData()).trim().split("!")[0]);
@@ -126,16 +126,15 @@ public class ClientGameScreen extends GameScreen{
     }
 
     public void updateServer(){
-        InetAddress inetAddress = null;
         try {
-            inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
+            InetAddress inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
             String packetString = "" + MessageTypes.PLAYER_POS +","+thisPlayer.position.x+","+thisPlayer.position.y + "!";
             buf = packetString.getBytes();
             DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
             socket.send(packet);
         } catch (UnknownHostException e) {
             e.printStackTrace();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -147,17 +146,28 @@ public class ClientGameScreen extends GameScreen{
 
         parent.batch.begin();
 
+        //Drawing who scored
+        if(connectionState == GAME_PAUSED && lastScored != -1){
+            String scorer = "";
+            if(lastScored == thisPlayer.playerNumber){
+                scorer = parent.myUsername;
+            }
+            else{
+                scorer = nameOpponent;
+            }
+            parent.fontBig.draw(parent.batch, scorer + " scored!",width * 0.18f, height * 0.5f);
+        }
+
         //Drawing paused timer
         if(connectionState == GAME_PAUSED && pauseTime > 0){
             parent.fontBig.draw(parent.batch, Integer.toString( (int) pauseTime + 1),width * 0.49f, height * 0.6f);
         }
 
+        //Drawing state
         if(connectionState == WAITING_FOR_LFG_ACK){
-            parent.font.draw(parent.batch, "WAITING_FOR_LFG_ACK",width * 0.2f, height * 0.7f);
+            parent.font.draw(parent.batch, "Connecting to matchmaking",width * 0.2f, height * 0.7f);
         } else if(connectionState == WAITING_FOR_GAMEINFO){
-            parent.font.draw(parent.batch, "WAITING_FOR_GAMEINFO",width * 0.2f, height * 0.7f);
-        } else if(connectionState == WAITING_FOR_START){
-            parent.font.draw(parent.batch, "WAITING_FOR_START",width * 0.2f, height * 0.7f);
+            parent.font.draw(parent.batch, "Looking for game",width * 0.2f, height * 0.7f);
         } else if(connectionState == GAME_ENDED){
             parent.font.draw(parent.batch, "GAME ENDED",width * 0.2f, height * 0.7f);
         }
@@ -166,10 +176,9 @@ public class ClientGameScreen extends GameScreen{
     }
 
     public void sendLFG(){
-        InetAddress inetAddress = null;
         try {
-            inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
-            String packetString = "" + MessageTypes.LFG +","+"defaultName"+"!";
+            InetAddress inetAddress = InetAddress.getByName(NetworkConstants.SERVER_ADDRESS);
+            String packetString = "" + MessageTypes.LFG +","+parent.myUsername+"!";
             buf = packetString.getBytes();
             DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
             socket.send(packet);
@@ -195,6 +204,8 @@ public class ClientGameScreen extends GameScreen{
             String address = message.sourceAddress;
             InetAddress inetAddress = InetAddress.getByName(address);
 
+            String packetString;
+
             switch (message.id){
                 case MessageTypes.LFG_ACK:
                     System.out.println("Received LFG_ACK");
@@ -209,6 +220,8 @@ public class ClientGameScreen extends GameScreen{
                     numRetries = 0;
 
                     String playerNumberString = message.data[0].trim();
+                    nameOpponent = message.data[1].trim();
+
                     this.playerNumber = Integer.parseInt(playerNumberString);
                     if(playerNumber == 0){
                         thisPlayer = gameClass.player1;
@@ -220,7 +233,7 @@ public class ClientGameScreen extends GameScreen{
                     pauseTime = Constants.START_PAUSE_TIME;
 
                     //Respond with GAME_INFO_ACK
-                    String packetString = "" + MessageTypes.GAME_INFO_ACK + "!";
+                    packetString = "" + MessageTypes.GAME_INFO_ACK + "!";
                     buf = packetString.getBytes();
                     DatagramPacket packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
                     socket.send(packet);
@@ -256,19 +269,24 @@ public class ClientGameScreen extends GameScreen{
 
                     String player = message.data[0].trim();
                     lastScored = Integer.parseInt(player);
-                    if(lastScored == 0){
-                        gameClass.player2.lives--;
-                        if(gameClass.player2.lives == 0){
-                            connectionState = GAME_ENDED;
-                            gameClass.state = gameClass.ENDED;
-                        }
-                    } else{
-                        gameClass.player1.lives--;
-                        if(gameClass.player1.lives == 0){
-                            connectionState = GAME_ENDED;
-                            gameClass.state = gameClass.ENDED;
-                        }
+                    int p1Lives = Integer.parseInt(message.data[1].trim());
+                    int p2Lives = Integer.parseInt(message.data[2].trim());
+
+                    gameClass.player1.lives = p1Lives;
+                    gameClass.player2.lives = p2Lives;
+
+                    if(gameClass.player1.lives  == 0 || gameClass.player2.lives == 0){
+                        connectionState = GAME_ENDED;
+                        gameClass.state = gameClass.ENDED;
                     }
+
+                    packetString = "" + MessageTypes.GAME_SCORED_ACK + "!";
+                    buf = packetString.getBytes();
+                    packet = new DatagramPacket(buf,buf.length,inetAddress,NetworkConstants.SERVER_PORT);
+                    socket.send(packet);
+                    break;
+                default:
+                    System.out.println("Unknown message received");
             }
         } catch (InterruptedException e) {
             e.printStackTrace();

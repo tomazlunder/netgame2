@@ -14,7 +14,7 @@ import java.util.ArrayList;
 public class MainMenuScreen implements Screen {
     private MainClass parent;
 
-    Sprite spriteBackgound;
+    Sprite spriteBackground;
 
     Button buttonPlaySolo;
     Button buttonPlayMatchmaking;
@@ -28,7 +28,7 @@ public class MainMenuScreen implements Screen {
     @Override
     public void show() {
         // TODO Auto-generated method stub
-        spriteBackgound = new Sprite(new Texture("images/white.png"));
+        spriteBackground = new Sprite(new Texture("images/white.png"));
 
         buttons = new ArrayList<>();
         buttonPlaySolo = new Button(0.1f, 0.7f, 0.2f, 0.10f, "images/plays_btn.png", "images/plays_btn_sel.png");
@@ -40,7 +40,7 @@ public class MainMenuScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        handleInput(delta);
+        handleInput();
 
         float width = Gdx.graphics.getWidth();
         float height = Gdx.graphics.getHeight();
@@ -49,7 +49,7 @@ public class MainMenuScreen implements Screen {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
         parent.batch.begin();
-        parent.batch.draw(spriteBackgound, width * Constants.BORDER_RATIO, height * Constants.BORDER_RATIO, width*(1-2*Constants.BORDER_RATIO), height*(1-2*Constants.BORDER_RATIO));
+        parent.batch.draw(spriteBackground, width * Constants.BORDER_RATIO, height * Constants.BORDER_RATIO, width*(1-2*Constants.BORDER_RATIO), height*(1-2*Constants.BORDER_RATIO));
         for(Button b : buttons){
             b.draw(parent.batch);
         }
@@ -58,7 +58,11 @@ public class MainMenuScreen implements Screen {
 
     @Override
     public void resize(int width, int height) {
+
         parent.batch.getProjectionMatrix().setToOrtho2D(0, 0, width, height);
+        for(Button b: buttons){
+            b.calculatePosAndDim();
+        }
     }
 
     @Override
@@ -82,7 +86,7 @@ public class MainMenuScreen implements Screen {
     }
 
     //INPUT
-    public void handleInput(float deltaTime){
+    public void handleInput(){
         for(Button b : buttons){
             b.updateMouse();
         }
@@ -105,7 +109,12 @@ public class MainMenuScreen implements Screen {
         parent.changeScreen(parent.GAME);
     }
     public void buttonPlayMatchmakingClicked(){
-        parent.changeScreen(parent.GAME_MATCHMAKING);
+        if(parent.myUsername.length() == 0){
+            parent.changeScreen(parent.ENTER_NAME);
+        }
+        else {
+            parent.changeScreen(parent.GAME_MATCHMAKING);
+        }
     }
 
 }

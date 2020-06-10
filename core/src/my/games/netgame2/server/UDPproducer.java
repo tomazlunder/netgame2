@@ -1,21 +1,18 @@
 package my.games.netgame2.server;
 
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.regex.Pattern;
 
 public  class UDPproducer implements Runnable{
-    protected DatagramSocket socket = null;
+    protected DatagramSocket socket;
     protected boolean listen = true;
 
     private BlockingQueue<Message> blockingQueue;
 
-    public UDPproducer(DatagramSocket socket, BlockingQueue<Message> bq) throws IOException {
+    public UDPproducer(DatagramSocket socket, BlockingQueue<Message> bq) {
         this.socket = socket;
 
         this.blockingQueue = bq;

@@ -29,7 +29,6 @@ public class Server {
     public static BlockingQueue<Message> blockingQueue;
 
     public static long time;
-    public static long elapsed;
 
     public static long lastUpdatedGames;
     public static long lastRanMatchmaking;
@@ -43,7 +42,6 @@ public class Server {
     private static byte[] buf;
 
     static int gameID;
-    static long tick = 0;
 
     public static void main(String[] args) throws IOException {
         games = new ArrayList<>();
@@ -55,8 +53,10 @@ public class Server {
         clientPlayerMap = new HashMap<>();
         socket = new DatagramSocket(NetworkConstants.SERVER_PORT);
         gameID = 0;
+        time = System.currentTimeMillis();
 
-        blockingQueue = new ArrayBlockingQueue<Message>(128);
+
+        blockingQueue = new ArrayBlockingQueue<>(128);
         UDPproducer udpProducer = new UDPproducer(socket,blockingQueue);
         new Thread(udpProducer).start();
         System.out.println("Spawned UDP producer thread");
@@ -67,6 +67,7 @@ public class Server {
     }
 
     public static void serverLoop(){
+        float dt = System.currentTimeMillis() - time;
         time = System.currentTimeMillis();
 
         if(time - lastRanMatchmaking >= MATCHMAKING_FREQUENCY && currentMatchmaking.size() == 0){
@@ -81,6 +82,7 @@ public class Server {
         }
 
         respondToMessages();
+        resendPackets(dt/1000f);
     }
 
     private static void matchMaking(){
@@ -94,7 +96,7 @@ public class Server {
                 currentMatchmaking.add(client2);
 
                 //GAME_INFO for client1
-                String packetString = "" + MessageTypes.GAME_INFO + "," + "0" + "!";
+                String packetString = "" + MessageTypes.GAME_INFO + "," + "0" + "," + client2.name +"!";
                 buf = packetString.getBytes();
                 DatagramPacket packet = new DatagramPacket(buf, buf.length, client1.ip, client1.port);
                 socket.send(packet);
@@ -105,7 +107,7 @@ public class Server {
 
 
                 //GAME_INFO for client2
-                packetString = "" + MessageTypes.GAME_INFO + "," + "1" + "!";
+                packetString = "" + MessageTypes.GAME_INFO + "," + "1" + "," + client1.name + "!";
                 buf = packetString.getBytes();
                 packet = new DatagramPacket(buf, buf.length, client2.ip, client2.port);
                 socket.send(packet);
@@ -126,7 +128,6 @@ public class Server {
     }
 
     private static void runGames(float deltaTime){
-        tick++;
         ArrayList<GameClass> gamesToRemove = new ArrayList<>();
 
         for(GameClass game : games){
@@ -136,7 +137,7 @@ public class Server {
             Client client2 = playerClientMap.get(game.player2);
 
             //Update clients on game state
-            if(game.state != game.PAUSED && tick%1==0){
+            if(game.state != game.PAUSED){
                 try {
                     //GAME_STATE for both clients
                     String packetString = "" + MessageTypes.GAME_STATE
@@ -163,13 +164,25 @@ public class Server {
                 try {
                     String packetString = "" + MessageTypes.GAME_SCORED
                             + "," + game.justScored //Id of player that scored
+                            + "," + game.player1.lives
+                            + "," + game.player2.lives
                             + "!";
                     buf = packetString.getBytes();
                     DatagramPacket packet = new DatagramPacket(buf, buf.length, client1.ip, client1.port);
                     socket.send(packet);
+                    client1.lastPacket = packet;
+                    client1.retryTimer = 0;
+                    client1.numRetries = 0;
+                    client1.state = Client.WAITING_FOR_SCORED_ACK;
+
                     packet = new DatagramPacket(buf, buf.length, client2.ip, client2.port);
                     socket.send(packet);
-                    System.out.println("[GAME"+game.gameID+"] Sent GAME_SCORED " + game.justScored);
+                    client2.lastPacket = packet;
+                    client2.retryTimer = 0;
+                    client2.numRetries = 0;
+                    client2.state = Client.WAITING_FOR_SCORED_ACK;
+
+                    System.out.println("[GAME"+game.gameID+"] Sent GAME_SCORED " + game.justScored + " " + game.player1.lives + " " + game.player2.lives);
 
                 } catch (IOException e){
                     e.printStackTrace();
@@ -270,6 +283,9 @@ public class Server {
                     }catch (NumberFormatException e){
                         e.printStackTrace();
                     }
+                case MessageTypes.GAME_SCORED_ACK:
+                    client = fullAddressClientMap.get(fullAddress);
+                    client.state = Client.IN_GAME;
             }
         } catch (InterruptedException e) {
             //e.printStackTrace();
@@ -284,7 +300,9 @@ public class Server {
 
     private static void resendPackets(float deltaTime){
         for(Client client : allClients){
-            if(client.state == Client.WAITING_FOR_GAMEINFO_ACK){
+            //If client didn't acknowledge receiving game info: retry if sufficient time elapsed
+            if(client.state == Client.WAITING_FOR_GAMEINFO_ACK ||
+                client.state == Client.WAITING_FOR_SCORED_ACK){
                 client.retryTimer += deltaTime;
             }
             else{
@@ -294,12 +312,14 @@ public class Server {
             if(client.retryTimer > NetworkConstants.PACKET_RETRY_TIME){
                 client.numRetries++;
 
-                if(client.numRetries > 100){
+                if(client.numRetries > NetworkConstants.MAX_PACKET_RETRIES){
                     //TODO: IF NUM RETRIES MORE THAN MAX
+                    System.out.println("RESENDING max retries reached (TODO: handle this!)");
                 }
 
                 try {
                     socket.send(client.lastPacket);
+                    System.out.println("RESENDING packet to ("+client.ip+":"+client.port+") :" + new String(client.lastPacket.getData()).split("!")[0]);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -309,11 +329,10 @@ public class Server {
     }
 
     private static class Client{
-        //public static final int RECEIVED_PING = 0;
         public static final int RECEIVED_LFG = 1;
         public static final int WAITING_FOR_GAMEINFO_ACK = 2;
-        public static final int RECEIVED_GAMEINFO_ACK = 3;
-        public static final int IN_GAME = 4;
+        public static final int IN_GAME = 3;
+        public static final int WAITING_FOR_SCORED_ACK = 4;
 
         public int state;
         public DatagramPacket lastPacket;
@@ -332,7 +351,6 @@ public class Server {
 
             this.retryTimer = 0;
             this.numRetries = 0;
-            //this.state = RECEIVED_PING;
         }
     }
 }
